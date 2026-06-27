@@ -6,8 +6,11 @@ import { SlidePanel } from '@/components/ui/SlidePanel';
 import { Modal, FormField, Input, Select, Button } from '@/components/ui/Primitives';
 import { daysLeft, fmtDate, statusColor, priorityColor } from '@/lib/utils';
 import { Item } from '@/lib/types';
+import KanbanBoard from '@/components/kanban/KanbanBoard';
+import GanttChart from '@/components/gantt/GanttChart';
 
 const PRIORITY_OPTIONS = ['P0', 'P1', 'P2', 'P3'];
+type ViewMode = 'list' | 'kanban' | 'gantt';
 
 export default function ItemsPage() {
   const { clients } = useClients();
@@ -15,6 +18,7 @@ export default function ItemsPage() {
   const { items, loading, addItem, updateItem } = useItems();
   const { statuses: itemStatuses } = useStatuses('item');
 
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -26,7 +30,7 @@ export default function ItemsPage() {
   const [form, setForm] = useState({ client_id: '', section: '', item: '', priority: 'P2', status: 'Not Started', owner: '', start_date: '', due_date: '' });
   const [saving, setSaving] = useState(false);
 
-  // Expanded states for collapsible groups
+  // Expanded states for collapsible groups (list view)
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
@@ -47,7 +51,7 @@ export default function ItemsPage() {
     return [...new Set(items.map(i => clientNameMap.get(i.client_id) || ''))].filter(Boolean).sort();
   }, [items, clientNameMap]);
 
-  // Filter items
+  // Filter items (shared across all views)
   let allItems = items.map(i => ({
     ...i,
     client_name: clientNameMap.get(i.client_id) || '',
@@ -70,7 +74,7 @@ export default function ItemsPage() {
     );
   }
 
-  // Group by client, then by section
+  // Group by client, then by section (for list view)
   const grouped = useMemo(() => {
     const clientMap = new Map<string, { client_name: string; csm_name: string; sections: Map<string, Item[]> }>();
     allItems.forEach(item => {
@@ -141,7 +145,32 @@ export default function ItemsPage() {
           <h2 className="text-xl font-bold tracking-tight">Implementation Items</h2>
           <p className="text-sm text-gray-400 mt-1">All implementation steps across clients</p>
         </div>
-        <Button onClick={() => setShowModal(true)}>+ Add item</Button>
+        <div className="flex items-center gap-3">
+          {/* View Toggle */}
+          <div className="flex bg-gray-100 rounded-lg p-0.5">
+            {([
+              { key: 'list' as const, label: 'List', icon: 'M4 6h16M4 12h16M4 18h16' },
+              { key: 'kanban' as const, label: 'Kanban', icon: 'M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z' },
+              { key: 'gantt' as const, label: 'Gantt', icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h10a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2zm0 8a1 1 0 011-1h6a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2z' },
+            ]).map(v => (
+              <button
+                key={v.key}
+                onClick={() => setViewMode(v.key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  viewMode === v.key
+                    ? 'bg-white text-gray-800 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d={v.icon} />
+                </svg>
+                {v.label}
+              </button>
+            ))}
+          </div>
+          <Button onClick={() => setShowModal(true)}>+ Add item</Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -187,86 +216,86 @@ export default function ItemsPage() {
         </div>
       </div>
 
-      {/* Table header */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <div className="grid grid-cols-[140px_1fr_1.5fr_120px_100px_100px_100px_120px_120px_40px] gap-2 px-4 py-2.5 border-b border-gray-100 bg-gray-50/50">
-          {['Client', 'Item', 'Background', 'Owner', 'Priority', 'Start Date', 'Due Date', 'Status', 'Last Update', ''].map(h => (
-            <div key={h} className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{h}</div>
-          ))}
-        </div>
+      {/* ===== LIST VIEW ===== */}
+      {viewMode === 'list' && (
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="grid grid-cols-[1fr_1.5fr_120px_100px_100px_100px_120px_120px_40px] gap-2 px-4 py-2.5 border-b border-gray-100 bg-gray-50/50">
+            {['Item', 'Background', 'Owner', 'Priority', 'Start Date', 'Due Date', 'Status', 'Last Update', ''].map(h => (
+              <div key={h} className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{h}</div>
+            ))}
+          </div>
 
-        {/* Grouped content */}
-        <div>
-          {grouped.length === 0 && (
-            <div className="px-4 py-12 text-center text-gray-400 text-sm">No items found</div>
-          )}
+          <div>
+            {grouped.length === 0 && (
+              <div className="px-4 py-12 text-center text-gray-400 text-sm">No items found</div>
+            )}
 
-          {grouped.map(([clientId, clientData]) => {
-            const clientExpanded = expandedClients.has(clientId);
-            const clientItems = allItems.filter(i => i.client_id === clientId);
-            const clientCompleted = clientItems.filter(i => i.status === 'Completed').length;
-            const clientPct = clientItems.length > 0 ? Math.round((clientCompleted / clientItems.length) * 100) : 0;
+            {grouped.map(([clientId, clientData]) => {
+              const clientExpanded = expandedClients.has(clientId);
+              const clientItems = allItems.filter(i => i.client_id === clientId);
+              const clientCompleted = clientItems.filter(i => i.status === 'Completed').length;
+              const clientPct = clientItems.length > 0 ? Math.round((clientCompleted / clientItems.length) * 100) : 0;
 
-            return (
-              <div key={clientId}>
-                {/* Client header row */}
-                <div
-                  className="grid grid-cols-[140px_1fr_1.5fr_120px_100px_100px_100px_120px_120px_40px] gap-2 px-4 py-3 bg-blue-50/40 border-b border-gray-100 cursor-pointer hover:bg-blue-50/60 transition-colors"
-                  onClick={() => toggleClient(clientId)}
-                >
-                  <div className="col-span-10 flex items-center gap-2">
-                    <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${clientExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                    <span className="text-xs font-bold text-[#4556e0] uppercase tracking-wide">{clientData.client_name}</span>
-                    {clientData.csm_name && (
-                      <span className="text-[10px] font-semibold bg-[#4556e0]/10 text-[#4556e0] px-2 py-0.5 rounded-full">
-                        {clientData.csm_name.toUpperCase()}
-                      </span>
-                    )}
+              return (
+                <div key={clientId}>
+                  {/* Client header row */}
+                  <div
+                    className="grid grid-cols-[1fr_1.5fr_120px_100px_100px_100px_120px_120px_40px] gap-2 px-4 py-3 bg-blue-50/40 border-b border-gray-100 cursor-pointer hover:bg-blue-50/60 transition-colors"
+                    onClick={() => toggleClient(clientId)}
+                  >
+                    <div className="col-span-9 flex items-center gap-2">
+                      <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${clientExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                      <span className="text-xs font-bold text-[#4556e0] uppercase tracking-wide">{clientData.client_name}</span>
+                      {clientData.csm_name && (
+                        <span className="text-[10px] font-semibold bg-[#4556e0]/10 text-[#4556e0] px-2 py-0.5 rounded-full">
+                          {clientData.csm_name.toUpperCase()}
+                        </span>
+                      )}
+                      <div className="flex items-center gap-1.5 ml-2">
+                        <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                          <div className="h-full bg-green-500 rounded-full" style={{ width: `${clientPct}%` }} />
+                        </div>
+                        <span className="text-[10px] text-gray-400">{clientCompleted}/{clientItems.length} ({clientPct}%)</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                {/* Sections under this client */}
-                {clientExpanded && Array.from(clientData.sections.entries()).map(([sectionName, sectionItems]) => {
-                  const sectionKey = `${clientId}-${sectionName}`;
-                  const sectionExpanded = expandedSections.has(sectionKey);
-                  const secCompleted = sectionItems.filter(i => i.status === 'Completed').length;
-                  const secPct = sectionItems.length > 0 ? Math.round((secCompleted / sectionItems.length) * 100) : 0;
+                  {clientExpanded && Array.from(clientData.sections.entries()).map(([sectionName, sectionItems]) => {
+                    const sectionKey = `${clientId}-${sectionName}`;
+                    const sectionExpanded = expandedSections.has(sectionKey);
+                    const secCompleted = sectionItems.filter(i => i.status === 'Completed').length;
+                    const secPct = sectionItems.length > 0 ? Math.round((secCompleted / sectionItems.length) * 100) : 0;
 
-                  return (
-                    <div key={sectionKey}>
-                      {/* Section header row */}
-                      <div
-                        className="grid grid-cols-[140px_1fr_1.5fr_120px_100px_100px_100px_120px_120px_40px] gap-2 px-4 py-2.5 bg-gray-50/80 border-b border-gray-50 cursor-pointer hover:bg-gray-100/60 transition-colors"
-                        onClick={() => toggleSection(sectionKey)}
-                      >
-                        <div className="col-span-10 flex items-center gap-2">
-                          <svg className={`w-3 h-3 text-gray-400 transition-transform ${sectionExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                          </svg>
-                          <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wide">{sectionName}</span>
-                          <span className="text-[10px] text-gray-400">({sectionItems.length})</span>
-                          <div className="flex items-center gap-1.5 ml-2">
-                            <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                              <div className="h-full bg-amber-500 rounded-full" style={{ width: `${secPct}%` }} />
+                    return (
+                      <div key={sectionKey}>
+                        <div
+                          className="grid grid-cols-[1fr_1.5fr_120px_100px_100px_100px_120px_120px_40px] gap-2 px-4 py-2.5 bg-gray-50/80 border-b border-gray-50 cursor-pointer hover:bg-gray-100/60 transition-colors"
+                          onClick={() => toggleSection(sectionKey)}
+                        >
+                          <div className="col-span-9 flex items-center gap-2 pl-5">
+                            <svg className={`w-3 h-3 text-gray-400 transition-transform ${sectionExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                            <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wide">{sectionName}</span>
+                            <span className="text-[10px] text-gray-400">({sectionItems.length})</span>
+                            <div className="flex items-center gap-1.5 ml-2">
+                              <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                <div className="h-full bg-amber-500 rounded-full" style={{ width: `${secPct}%` }} />
+                              </div>
+                              <span className="text-[10px] text-gray-400">{secCompleted}/{sectionItems.length} ({secPct}%)</span>
                             </div>
-                            <span className="text-[10px] text-gray-400">{secCompleted}/{sectionItems.length} ({secPct}%)</span>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Items under this section */}
-                      {sectionExpanded && sectionItems.map(item => {
-                        const days = daysLeft(item.due_date || item.eta);
-                        return (
+                        {sectionExpanded && sectionItems.map(item => (
                           <div
                             key={item.id}
-                            className="grid grid-cols-[140px_1fr_1.5fr_120px_100px_100px_100px_120px_120px_40px] gap-2 px-4 py-3 border-b border-gray-50 hover:bg-blue-50/20 cursor-pointer transition-colors items-center"
+                            className="grid grid-cols-[1fr_1.5fr_120px_100px_100px_100px_120px_120px_40px] gap-2 px-4 py-3 border-b border-gray-50 hover:bg-blue-50/20 cursor-pointer transition-colors items-center"
                             onClick={() => setSelectedItem(item)}
                           >
-                            <div className="text-xs font-medium text-[#4556e0] truncate">{item.client_name}</div>
-                            <div className="text-xs font-medium text-gray-800 truncate">{item.item}</div>
+                            <div className="text-xs font-medium text-gray-800 truncate pl-5">{item.item}</div>
                             <div className="text-xs text-gray-500 truncate">{item.last_update_text || '—'}</div>
                             <div className="text-xs text-gray-500 truncate" onClick={e => e.stopPropagation()}>
                               <input
@@ -327,18 +356,38 @@ export default function ItemsPage() {
                               </button>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Slide-out Detail Panel */}
+      {/* ===== KANBAN VIEW ===== */}
+      {viewMode === 'kanban' && (
+        <KanbanBoard
+          items={allItems}
+          statuses={itemStatuses}
+          onItemClick={setSelectedItem}
+          clientNameMap={clientNameMap}
+        />
+      )}
+
+      {/* ===== GANTT VIEW ===== */}
+      {viewMode === 'gantt' && (
+        <GanttChart
+          items={allItems}
+          statuses={itemStatuses}
+          onItemClick={setSelectedItem}
+          clientNameMap={clientNameMap}
+        />
+      )}
+
+      {/* Slide-out Detail Panel (shared across views) */}
       <SlidePanel open={!!selectedItem} onClose={() => setSelectedItem(null)} title="Item Details" width="w-[520px]">
         {selected && (
           <div className="space-y-1">
