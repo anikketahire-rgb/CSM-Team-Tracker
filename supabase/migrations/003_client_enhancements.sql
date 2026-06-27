@@ -1,5 +1,5 @@
 -- Migration 003: Client enhancements, item comments, sync logging
--- Run this in Supabase SQL Editor
+-- Safe to re-run (uses IF NOT EXISTS throughout)
 
 -- 1. New client fields
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS report_frequency text default 'Weekly';
@@ -48,16 +48,24 @@ CREATE INDEX IF NOT EXISTS sync_log_created_at on sync_log(created_at desc);
 ALTER TABLE item_updates enable row level security;
 ALTER TABLE sync_log enable row level security;
 
--- item_updates policies
+-- Drop and recreate policies to avoid "already exists" errors
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Authenticated can read item_updates" ON item_updates;
+  DROP POLICY IF EXISTS "Authenticated can insert item_updates" ON item_updates;
+  DROP POLICY IF EXISTS "Authenticated can update item_updates" ON item_updates;
+  DROP POLICY IF EXISTS "Authenticated can delete item_updates" ON item_updates;
+  DROP POLICY IF EXISTS "Anonymous can read item_updates" ON item_updates;
+  DROP POLICY IF EXISTS "Authenticated can read sync_log" ON sync_log;
+  DROP POLICY IF EXISTS "Authenticated can insert sync_log" ON sync_log;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
 CREATE POLICY "Authenticated can read item_updates" ON item_updates FOR select USING (auth.role() = 'authenticated');
 CREATE POLICY "Authenticated can insert item_updates" ON item_updates FOR insert WITH check (auth.role() = 'authenticated');
 CREATE POLICY "Authenticated can update item_updates" ON item_updates FOR update USING (auth.role() = 'authenticated');
 CREATE POLICY "Authenticated can delete item_updates" ON item_updates FOR delete USING (auth.role() = 'authenticated');
-
--- Allow anonymous read for item_updates (needed for public share pages)
 CREATE POLICY "Anonymous can read item_updates" ON item_updates FOR select USING (true);
 
--- sync_log policies
 CREATE POLICY "Authenticated can read sync_log" ON sync_log FOR select USING (auth.role() = 'authenticated');
 CREATE POLICY "Authenticated can insert sync_log" ON sync_log FOR insert WITH check (auth.role() = 'authenticated');
 
@@ -70,6 +78,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS item_updates_updated_at ON item_updates;
 CREATE TRIGGER item_updates_updated_at
   BEFORE UPDATE ON item_updates
   FOR EACH ROW EXECUTE FUNCTION update_item_updates_updated_at();
