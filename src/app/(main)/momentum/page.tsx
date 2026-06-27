@@ -16,8 +16,8 @@ export default function MomentumPage() {
       const inProgress = cItems.filter(i => i.status === 'In Progress').length;
       const blocked = cItems.filter(i => i.status === 'Blocked' || i.status === 'Delayed').length;
       const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-      const overdue = cItems.filter(i => { const d = daysLeft(i.eta); return d !== null && d < 0 && i.status !== 'Completed'; }).length;
-      const next7 = cItems.filter(i => { const d = daysLeft(i.eta); return d !== null && d >= 0 && d <= 7 && i.status !== 'Completed'; }).length;
+      const overdue = cItems.filter(i => { const d = daysLeft(i.due_date || i.eta); return d !== null && d < 0 && i.status !== 'Completed'; }).length;
+      const next7 = cItems.filter(i => { const d = daysLeft(i.due_date || i.eta); return d !== null && d >= 0 && d <= 7 && i.status !== 'Completed'; }).length;
       return { client: c.name, csm: c.csm_name, health: c.health, total, completed, inProgress, blocked, pct, overdue, next7 };
     }).sort((a, b) => a.pct - b.pct);
   }, [clients, items]);

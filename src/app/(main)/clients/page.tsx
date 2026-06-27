@@ -258,7 +258,7 @@ export default function ClientsPage() {
               {selectedItems.length > 0 ? (
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {selectedItems.map(item => {
-                    const d = daysLeft(item.eta);
+                    const d = daysLeft(item.due_date || item.eta);
                     return (
                       <div key={item.id} className="flex items-center gap-3 py-2 px-3 bg-gray-50 rounded-lg">
                         <div className="flex-1 min-w-0">

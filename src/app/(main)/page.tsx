@@ -21,7 +21,7 @@ export default function DashboardPage() {
     const completedItems = items.filter(i => i.status === 'Completed').length;
     const openTickets = tickets.filter(t => t.status === 'Open' || t.status === 'In Progress').length;
     const overdueItems = items.filter(i => {
-      const d = daysLeft(i.eta);
+      const d = daysLeft(i.due_date || i.eta);
       return d !== null && d < 0 && i.status !== 'Completed';
     }).length;
     return { totalACV, atRisk, totalItems, completedItems, openTickets, overdueItems, clientCount: clients.length };
@@ -46,7 +46,7 @@ export default function DashboardPage() {
 
   const atRiskItems = useMemo(() =>
     items.filter(i => {
-      const d = daysLeft(i.eta);
+      const d = daysLeft(i.due_date || i.eta);
       return (d !== null && d < 0 && i.status !== 'Completed') || i.status === 'Blocked';
     }).slice(0, 5),
   [items]);

@@ -38,7 +38,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="min-h-screen">
       <Sidebar />
-      <div className={cn('transition-all duration-300', sidebarOpen ? 'ml-60' : 'ml-0')}>
+      <div className={cn('transition-all duration-300', sidebarOpen ? 'ml-60' : 'ml-16')}>
         <AppHeader />
         <main className="p-6">{children}</main>
       </div>

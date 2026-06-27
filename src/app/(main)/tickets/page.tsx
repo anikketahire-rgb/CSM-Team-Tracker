@@ -1,28 +1,18 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useClients, useTickets } from '@/hooks/useData';
+import { useClients, useTickets, useStatuses } from '@/hooks/useData';
 import { SlidePanel } from '@/components/ui/SlidePanel';
 import { Modal, FormField, Input, Select, Button } from '@/components/ui/Primitives';
-import { fmtDate } from '@/lib/utils';
+import { fmtDate, statusColor, priorityColor } from '@/lib/utils';
 import { Ticket } from '@/lib/types';
 
-const STATUS_OPTIONS = ['Open', 'In Progress', 'Resolved', 'Closed'];
 const PRIORITY_OPTIONS = ['P0', 'P1', 'P2', 'P3'];
-
-function statusColor(s: string) {
-  const map: Record<string, string> = { Open: '#c47c17', 'In Progress': '#2979c2', Resolved: '#12a06a', Closed: '#9499b8' };
-  return map[s] || '#7756c4';
-}
-
-function priorityColor(p: string) {
-  const map: Record<string, string> = { P0: '#d03d3b', P1: '#c47c17', P2: '#7756c4', P3: '#12a06a' };
-  return map[p] || '#7756c4';
-}
 
 export default function TicketsPage() {
   const { clients } = useClients();
   const { tickets, loading, addTicket, updateTicket, deleteTicket } = useTickets();
+  const { statuses: ticketStatuses } = useStatuses('ticket');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -31,6 +21,8 @@ export default function TicketsPage() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ client_id: '', subject: '', description: '', reporter: '', priority: 'P2', status: 'Open', source: 'Manual' });
   const [saving, setSaving] = useState(false);
+
+  const statusOptions = useMemo(() => ticketStatuses.map(s => s.label), [ticketStatuses]);
 
   const clientNameMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
   const clientsList = useMemo(() => [...new Set(tickets.map(t => clientNameMap.get(t.client_id) || ''))].filter(Boolean).sort(), [tickets, clientNameMap]);
@@ -43,6 +35,11 @@ export default function TicketsPage() {
     const q = search.toLowerCase();
     allTickets = allTickets.filter(t => t.subject?.toLowerCase().includes(q) || t.client_name?.toLowerCase().includes(q) || t.reporter?.toLowerCase().includes(q));
   }
+
+  const getStatusColor = (label: string) => {
+    const found = ticketStatuses.find(s => s.label === label);
+    return found?.color || statusColor(label);
+  };
 
   const handleAdd = async () => {
     if (!form.subject.trim() || !form.client_id) return;
@@ -81,7 +78,8 @@ export default function TicketsPage() {
           {clientsList.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-[#4556e0]">
-          {['all',...STATUS_OPTIONS].map(s => <option key={s} value={s}>{s === 'all' ? 'All statuses' : s}</option>)}
+          <option value="all">All statuses</option>
+          {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-[#4556e0]">
           {['all',...PRIORITY_OPTIONS].map(p => <option key={p} value={p}>{p === 'all' ? 'All priorities' : p}</option>)}
@@ -130,9 +128,9 @@ export default function TicketsPage() {
                     value={t.status}
                     onChange={e => handleInlineUpdate(t.id, 'status', e.target.value)}
                     className="text-[11px] font-semibold border-0 bg-transparent cursor-pointer outline-none rounded px-1 py-0.5 hover:bg-gray-50"
-                    style={{ color: statusColor(t.status) }}
+                    style={{ color: getStatusColor(t.status) }}
                   >
-                    {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
+                    {statusOptions.map(s => <option key={s}>{s}</option>)}
                   </select>
                 </td>
                 <td className="px-4 py-3 text-xs text-gray-400">{t.source || '—'}</td>
@@ -192,7 +190,7 @@ export default function TicketsPage() {
                     onChange={e => handleInlineUpdate(selectedTicket.id, 'status', e.target.value)}
                     className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4556e0]"
                   >
-                    {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
+                    {statusOptions.map(s => <option key={s}>{s}</option>)}
                   </select>
                 </div>
               </div>
@@ -253,7 +251,7 @@ export default function TicketsPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Priority"><Select value={form.priority} onChange={e => setForm({...form, priority: e.target.value})}>{PRIORITY_OPTIONS.map(p => <option key={p}>{p}</option>)}</Select></FormField>
-            <FormField label="Status"><Select value={form.status} onChange={e => setForm({...form, status: e.target.value})}>{STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}</Select></FormField>
+            <FormField label="Status"><Select value={form.status} onChange={e => setForm({...form, status: e.target.value})}>{statusOptions.map(s => <option key={s}>{s}</option>)}</Select></FormField>
           </div>
         </div>
       </Modal>

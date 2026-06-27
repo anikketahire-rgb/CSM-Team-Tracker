@@ -24,6 +24,7 @@ export interface Client {
   owners: string[];
   sync_enabled: boolean;
   last_synced_at: string;
+  share_token: string;
   created_at: string;
 }
 
@@ -38,6 +39,7 @@ export interface Item {
   owner: string;
   eta: string;
   start_date: string;
+  due_date: string;
   last_update_text: string;
   last_update_date: string;
   row_index: number;
@@ -66,6 +68,15 @@ export interface ActivityLog {
   type: string;
   client: string;
   message: string;
+  created_at: string;
+}
+
+export interface CustomStatus {
+  id: string;
+  category: 'item' | 'ticket';
+  label: string;
+  color: string;
+  sort_order: number;
   created_at: string;
 }
 

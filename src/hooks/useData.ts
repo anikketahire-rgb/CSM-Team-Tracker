@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Client, Item, Ticket, ActivityLog, User } from '@/lib/types';
+import { Client, Item, Ticket, ActivityLog, User, CustomStatus } from '@/lib/types';
 import { User as SupaUser } from '@supabase/supabase-js';
 
 export function useAuth() {
@@ -83,7 +83,14 @@ export function useClients() {
     return { error };
   };
 
-  return { clients, loading, fetchClients, addClient, updateClient, deleteClient };
+  const regenerateShareToken = async (id: string) => {
+    const token = Math.random().toString(36).substring(2, 14);
+    const { data, error } = await supabase.from('clients').update({ share_token: token }).eq('id', id).select().single();
+    if (data) setClients(prev => prev.map(c => c.id === id ? data : c));
+    return { data, error };
+  };
+
+  return { clients, loading, fetchClients, addClient, updateClient, deleteClient, regenerateShareToken };
 }
 
 export function useItems(clientId?: string) {
@@ -209,4 +216,41 @@ export function useUsers() {
   };
 
   return { users, loading, fetchUsers, addUser, updateUser };
+}
+
+export function useStatuses(category?: 'item' | 'ticket') {
+  const [statuses, setStatuses] = useState<CustomStatus[]>([]);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  const fetchStatuses = useCallback(async () => {
+    setLoading(true);
+    let query = supabase.from('custom_statuses').select('*').order('sort_order');
+    if (category) query = query.eq('category', category);
+    const { data } = await query;
+    if (data) setStatuses(data);
+    setLoading(false);
+  }, [category]);
+
+  useEffect(() => { fetchStatuses(); }, [fetchStatuses]);
+
+  const addStatus = async (status: Partial<CustomStatus>) => {
+    const { data, error } = await supabase.from('custom_statuses').insert(status).select().single();
+    if (data) setStatuses(prev => [...prev, data].sort((a, b) => a.sort_order - b.sort_order));
+    return { data, error };
+  };
+
+  const updateStatus = async (id: string, updates: Partial<CustomStatus>) => {
+    const { data, error } = await supabase.from('custom_statuses').update(updates).eq('id', id).select().single();
+    if (data) setStatuses(prev => prev.map(s => s.id === id ? data : s));
+    return { data, error };
+  };
+
+  const deleteStatus = async (id: string) => {
+    const { error } = await supabase.from('custom_statuses').delete().eq('id', id);
+    if (!error) setStatuses(prev => prev.filter(s => s.id !== id));
+    return { error };
+  };
+
+  return { statuses, loading, fetchStatuses, addStatus, updateStatus, deleteStatus };
 }

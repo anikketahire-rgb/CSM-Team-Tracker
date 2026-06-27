@@ -3,16 +3,18 @@
 import { useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
-import { Client, Item, Ticket } from '@/lib/types';
+import { Client, Item, Ticket, CustomStatus } from '@/lib/types';
 import { StatusBadge, PriorityBadge, HealthBadge, DaysLeftBadge } from '@/components/ui/Badges';
-import { fmtACV, fmtDate, daysLeft } from '@/lib/utils';
+import { fmtACV, fmtDate, daysLeft, statusColor } from '@/lib/utils';
 
 export default function ClientViewPage({ params }: { params: Promise<{ client: string }> }) {
   const [clientName, setClientName] = useState('');
   const [client, setClient] = useState<Client | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [statuses, setStatuses] = useState<CustomStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tokenValid, setTokenValid] = useState<boolean | null>(null);
 
   useEffect(() => {
     params.then(p => setClientName(decodeURIComponent(p.client)));
@@ -22,18 +24,38 @@ export default function ClientViewPage({ params }: { params: Promise<{ client: s
     if (!clientName) return;
     const supabase = createClient();
     const load = async () => {
+      // Check share token from URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token');
+
       const { data: c } = await supabase.from('clients').select('*').ilike('name', clientName).single();
       if (c) {
+        // Verify token if provided
+        if (token && c.share_token && token !== c.share_token) {
+          setTokenValid(false);
+          setLoading(false);
+          return;
+        }
+        setTokenValid(true);
         setClient(c);
         const { data: i } = await supabase.from('items').select('*').eq('client_id', c.id).order('section');
         if (i) setItems(i);
         const { data: t } = await supabase.from('tickets').select('*').eq('client_id', c.id).order('created_at', { ascending: false });
         if (t) setTickets(t);
+        const { data: s } = await supabase.from('custom_statuses').select('*').order('sort_order');
+        if (s) setStatuses(s);
+      } else {
+        setTokenValid(false);
       }
       setLoading(false);
     };
     load();
   }, [clientName]);
+
+  const getStatusColor = (label: string) => {
+    const found = statuses.find(s => s.label === label);
+    return found?.color || statusColor(label);
+  };
 
   const sections = useMemo(() => {
     const map = new Map<string, { total: number; completed: number; overdue: number; blocked: number }>();
@@ -44,7 +66,7 @@ export default function ClientViewPage({ params }: { params: Promise<{ client: s
       s.total++;
       if (item.status === 'Completed') s.completed++;
       if (item.status === 'Blocked' || item.status === 'Delayed') s.blocked++;
-      const d = daysLeft(item.eta);
+      const d = daysLeft(item.due_date || item.eta);
       if (d !== null && d < 0 && item.status !== 'Completed') s.overdue++;
     });
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
@@ -54,6 +76,7 @@ export default function ClientViewPage({ params }: { params: Promise<{ client: s
   const overallPct = items.length > 0 ? Math.round((totalCompleted / items.length) * 100) : 0;
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="w-8 h-8 border-2 border-[#4556e0] border-t-transparent rounded-full animate-spin" /></div>;
+  if (tokenValid === false) return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">Access denied or client not found</div>;
   if (!client) return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">Client not found</div>;
 
   return (
@@ -123,7 +146,7 @@ export default function ClientViewPage({ params }: { params: Promise<{ client: s
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-50">
-                  {['Section', 'Item', 'Priority', 'Status', 'Owner', 'ETA', 'Days Left'].map(h => (
+                  {['Section', 'Item', 'Priority', 'Status', 'Owner', 'Start Date', 'Due Date', 'Days Left'].map(h => (
                     <th key={h} className="px-4 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
@@ -134,10 +157,15 @@ export default function ClientViewPage({ params }: { params: Promise<{ client: s
                     <td className="px-4 py-3 text-xs text-gray-500">{item.section}</td>
                     <td className="px-4 py-3 text-xs font-medium">{item.item}</td>
                     <td className="px-4 py-3"><PriorityBadge priority={item.priority} /></td>
-                    <td className="px-4 py-3"><StatusBadge status={item.status} /></td>
+                    <td className="px-4 py-3">
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color: getStatusColor(item.status), backgroundColor: getStatusColor(item.status) + '15' }}>
+                        {item.status}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-xs text-gray-500">{item.owner || '—'}</td>
-                    <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(item.eta)}</td>
-                    <td className="px-4 py-3"><DaysLeftBadge days={daysLeft(item.eta)} /></td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(item.start_date)}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(item.due_date || item.eta)}</td>
+                    <td className="px-4 py-3"><DaysLeftBadge days={daysLeft(item.due_date || item.eta)} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -162,7 +190,11 @@ export default function ClientViewPage({ params }: { params: Promise<{ client: s
                     <tr key={t.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                       <td className="px-4 py-3 text-xs font-medium">{t.subject}</td>
                       <td className="px-4 py-3"><PriorityBadge priority={t.priority} /></td>
-                      <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
+                      <td className="px-4 py-3">
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color: getStatusColor(t.status), backgroundColor: getStatusColor(t.status) + '15' }}>
+                          {t.status}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(t.created_at)}</td>
                     </tr>
                   ))}
