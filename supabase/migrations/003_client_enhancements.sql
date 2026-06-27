@@ -22,12 +22,10 @@ CREATE TABLE IF NOT EXISTS item_updates (
   update_type text not null default 'Status Update',
   content text default '',
   author text default '',
+  source text default 'app',
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
-
--- Allow multiple comments per item per date (no unique constraint)
--- This handles cases where multiple topics are discussed per meeting
 
 CREATE INDEX IF NOT EXISTS item_updates_item_id on item_updates(item_id);
 CREATE INDEX IF NOT EXISTS item_updates_update_date on item_updates(update_date desc);
@@ -36,10 +34,10 @@ CREATE INDEX IF NOT EXISTS item_updates_update_date on item_updates(update_date 
 CREATE TABLE IF NOT EXISTS sync_log (
   id uuid primary key default uuid_generate_v4(),
   client_id uuid references clients(id) on delete cascade,
-  direction text not null check (direction in ('push', 'pull')),
-  status text not null check (status in ('success', 'error')),
-  details text default '',
-  items_affected integer default 0,
+  direction text not null,
+  status text not null,
+  items_synced integer default 0,
+  details jsonb default '{}',
   created_at timestamptz default now()
 );
 
@@ -75,11 +73,3 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER item_updates_updated_at
   BEFORE UPDATE ON item_updates
   FOR EACH ROW EXECUTE FUNCTION update_item_updates_updated_at();
-
--- 7. Migrate existing last_update_text/date to item_updates (optional, for existing data)
--- Uncomment if you want to migrate old data:
--- INSERT INTO item_updates (item_id, update_date, update_type, content, author)
--- SELECT id, last_update_date::date, 'Status Update', last_update_text, ''
--- FROM items
--- WHERE last_update_text != '' AND last_update_date != '' AND last_update_date IS NOT NULL
--- ON CONFLICT DO NOTHING;
