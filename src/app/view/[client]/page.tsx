@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
-import { Client, Item, Ticket, CustomStatus } from '@/lib/types';
+import { Client, Item, Ticket, CustomStatus, ItemUpdate } from '@/lib/types';
 import { StatusBadge, PriorityBadge, HealthBadge, DaysLeftBadge } from '@/components/ui/Badges';
 import { fmtACV, fmtDate, daysLeft, statusColor } from '@/lib/utils';
 
@@ -13,6 +13,7 @@ export default function ClientViewPage({ params }: { params: Promise<{ client: s
   const [items, setItems] = useState<Item[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [statuses, setStatuses] = useState<CustomStatus[]>([]);
+  const [itemUpdates, setItemUpdates] = useState<Map<string, ItemUpdate[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [tokenValid, setTokenValid] = useState<boolean | null>(null);
 
@@ -39,7 +40,20 @@ export default function ClientViewPage({ params }: { params: Promise<{ client: s
         setTokenValid(true);
         setClient(c);
         const { data: i } = await supabase.from('items').select('*').eq('client_id', c.id).order('section');
-        if (i) setItems(i);
+        if (i) {
+          setItems(i);
+          // Fetch updates for all items
+          const updatesMap = new Map<string, ItemUpdate[]>();
+          for (const item of i) {
+            const { data: u } = await supabase
+              .from('item_updates')
+              .select('*')
+              .eq('item_id', item.id)
+              .order('update_date', { ascending: false });
+            if (u && u.length > 0) updatesMap.set(item.id, u);
+          }
+          setItemUpdates(updatesMap);
+        }
         const { data: t } = await supabase.from('tickets').select('*').eq('client_id', c.id).order('created_at', { ascending: false });
         if (t) setTickets(t);
         const { data: s } = await supabase.from('custom_statuses').select('*').order('sort_order');
@@ -146,7 +160,7 @@ export default function ClientViewPage({ params }: { params: Promise<{ client: s
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-50">
-                  {['Section', 'Item', 'Priority', 'Status', 'Owner', 'Start Date', 'Due Date', 'Days Left'].map(h => (
+                  {['Section', 'Item', 'Background', 'Priority', 'Status', 'Owner', 'Start Date', 'Due Date', 'Days Left'].map(h => (
                     <th key={h} className="px-4 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
@@ -156,6 +170,9 @@ export default function ClientViewPage({ params }: { params: Promise<{ client: s
                   <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                     <td className="px-4 py-3 text-xs text-gray-500">{item.section}</td>
                     <td className="px-4 py-3 text-xs font-medium">{item.item}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500 max-w-[200px] truncate" title={(item as any).background || ''}>
+                      {(item as any).background || '—'}
+                    </td>
                     <td className="px-4 py-3"><PriorityBadge priority={item.priority} /></td>
                     <td className="px-4 py-3">
                       <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ color: getStatusColor(item.status), backgroundColor: getStatusColor(item.status) + '15' }}>
@@ -172,6 +189,51 @@ export default function ClientViewPage({ params }: { params: Promise<{ client: s
             </table>
           </div>
         </div>
+
+        {/* Comments / Updates Section */}
+        {items.some(item => itemUpdates.has(item.id)) && (
+          <div className="bg-white rounded-xl border border-gray-100 mb-6">
+            <div className="px-5 py-4 border-b border-gray-50">
+              <h2 className="text-sm font-semibold">Recent Updates</h2>
+            </div>
+            <div className="p-5 space-y-4">
+              {items.filter(item => itemUpdates.has(item.id)).slice(0, 10).map(item => {
+                const updates = itemUpdates.get(item.id) || [];
+                return (
+                  <div key={item.id} className="border-b border-gray-50 pb-4 last:border-0 last:pb-0">
+                    <div className="text-xs font-medium text-[#4556e0] mb-2">{item.item}</div>
+                    <div className="space-y-2">
+                      {updates.slice(0, 3).map(update => {
+                        const typeColors: Record<string, string> = {
+                          'Status Update': '#2979c2',
+                          'Blocker': '#d03d3b',
+                          'Decision Needed': '#c47c17',
+                          'Completed': '#12a06a',
+                          'Note': '#6b7280',
+                        };
+                        const color = typeColors[update.update_type] || '#6b7280';
+                        return (
+                          <div key={update.id} className="flex items-start gap-2">
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: color + '18', color }}>
+                              {update.update_type}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-gray-600">{update.content}</p>
+                              <div className="text-[10px] text-gray-400 mt-0.5">
+                                {fmtDate(update.update_date)} · {update.author || 'Unknown'}
+                                {update.source === 'sheet' && <span className="ml-1 text-blue-500">(from Sheet)</span>}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {tickets.length > 0 && (
           <div className="bg-white rounded-xl border border-gray-100 mb-6">

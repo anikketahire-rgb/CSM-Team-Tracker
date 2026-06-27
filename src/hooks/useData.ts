@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Client, Item, Ticket, ActivityLog, User, CustomStatus } from '@/lib/types';
+import { Client, Item, Ticket, ActivityLog, User, CustomStatus, ItemUpdate, SyncLog } from '@/lib/types';
 import { User as SupaUser } from '@supabase/supabase-js';
 
 export function useAuth() {
@@ -48,20 +48,19 @@ export function useAuth() {
   return { supabaseUser, profile, loading, signIn, signOut };
 }
 
-export function useClients() {
+export function useClients(includeArchived = false) {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
   const fetchClients = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('clients')
-      .select('*')
-      .order('name');
+    let query = supabase.from('clients').select('*').order('name');
+    if (!includeArchived) query = query.eq('archived', false);
+    const { data, error } = await query;
     if (data) setClients(data);
     setLoading(false);
-  }, []);
+  }, [includeArchived]);
 
   useEffect(() => { fetchClients(); }, [fetchClients]);
 
@@ -74,6 +73,18 @@ export function useClients() {
   const updateClient = async (id: string, updates: Partial<Client>) => {
     const { data, error } = await supabase.from('clients').update(updates).eq('id', id).select().single();
     if (data) setClients(prev => prev.map(c => c.id === id ? data : c));
+    return { data, error };
+  };
+
+  const archiveClient = async (id: string) => {
+    const { data, error } = await supabase.from('clients').update({ archived: true }).eq('id', id).select().single();
+    if (data) setClients(prev => prev.filter(c => c.id !== id));
+    return { data, error };
+  };
+
+  const restoreClient = async (id: string) => {
+    const { data, error } = await supabase.from('clients').update({ archived: false }).eq('id', id).select().single();
+    if (data) fetchClients();
     return { data, error };
   };
 
@@ -90,7 +101,7 @@ export function useClients() {
     return { data, error };
   };
 
-  return { clients, loading, fetchClients, addClient, updateClient, deleteClient, regenerateShareToken };
+  return { clients, loading, fetchClients, addClient, updateClient, archiveClient, restoreClient, deleteClient, regenerateShareToken };
 }
 
 export function useItems(clientId?: string) {
@@ -128,6 +139,46 @@ export function useItems(clientId?: string) {
   };
 
   return { items, loading, fetchItems, addItem, updateItem, deleteItem };
+}
+
+export function useItemUpdates(itemId?: string) {
+  const [updates, setUpdates] = useState<ItemUpdate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  const fetchUpdates = useCallback(async () => {
+    if (!itemId) { setLoading(false); return; }
+    setLoading(true);
+    const { data } = await supabase
+      .from('item_updates')
+      .select('*')
+      .eq('item_id', itemId)
+      .order('update_date', { ascending: false });
+    if (data) setUpdates(data);
+    setLoading(false);
+  }, [itemId]);
+
+  useEffect(() => { fetchUpdates(); }, [fetchUpdates]);
+
+  const addUpdate = async (update: Partial<ItemUpdate>) => {
+    const { data, error } = await supabase.from('item_updates').insert(update).select().single();
+    if (data) setUpdates(prev => [data, ...prev].sort((a, b) => new Date(b.update_date).getTime() - new Date(a.update_date).getTime()));
+    return { data, error };
+  };
+
+  const updateUpdate = async (id: string, updates: Partial<ItemUpdate>) => {
+    const { data, error } = await supabase.from('item_updates').update(updates).eq('id', id).select().single();
+    if (data) setUpdates(prev => prev.map(u => u.id === id ? data : u));
+    return { data, error };
+  };
+
+  const deleteUpdate = async (id: string) => {
+    const { error } = await supabase.from('item_updates').delete().eq('id', id);
+    if (!error) setUpdates(prev => prev.filter(u => u.id !== id));
+    return { error };
+  };
+
+  return { updates, loading, fetchUpdates, addUpdate, updateUpdate, deleteUpdate };
 }
 
 export function useTickets(clientId?: string) {
@@ -253,4 +304,28 @@ export function useStatuses(category?: 'item' | 'ticket') {
   };
 
   return { statuses, loading, fetchStatuses, addStatus, updateStatus, deleteStatus };
+}
+
+export function useSyncLog(clientId?: string) {
+  const [logs, setLogs] = useState<SyncLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    let query = supabase.from('sync_log').select('*').order('created_at', { ascending: false }).limit(50);
+    if (clientId) query = query.eq('client_id', clientId);
+    const { data } = await query;
+    if (data) setLogs(data);
+    setLoading(false);
+  }, [clientId]);
+
+  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+
+  const addLog = async (log: Partial<SyncLog>) => {
+    const { data } = await supabase.from('sync_log').insert(log).select().single();
+    if (data) setLogs(prev => [data, ...prev]);
+  };
+
+  return { logs, loading, fetchLogs, addLog };
 }

@@ -6,6 +6,12 @@ export interface User {
   created_at: string;
 }
 
+export interface OwnerPoolEntry {
+  name: string;
+  role: 'Client' | 'QuestionPro' | 'Third Party';
+  email: string;
+}
+
 export interface Client {
   id: string;
   name: string;
@@ -22,9 +28,17 @@ export interface Client {
   tab_name: string;
   email: string;
   owners: string[];
+  owner_pool: OwnerPoolEntry[];
+  categories: string[];
+  report_frequency: string;
+  phone: string;
+  timezone: string;
   sync_enabled: boolean;
   last_synced_at: string;
   share_token: string;
+  archived: boolean;
+  sheet_last_synced_at: string;
+  sheet_sync_error: string;
   created_at: string;
 }
 
@@ -34,6 +48,7 @@ export interface Item {
   client_name?: string;
   section: string;
   item: string;
+  background: string;
   priority: string;
   status: string;
   owner: string;
@@ -77,6 +92,28 @@ export interface CustomStatus {
   label: string;
   color: string;
   sort_order: number;
+  created_at: string;
+}
+
+export interface ItemUpdate {
+  id: string;
+  item_id: string;
+  update_date: string;
+  update_type: string;
+  content: string;
+  author: string;
+  source: 'app' | 'sheet';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SyncLog {
+  id: string;
+  client_id: string;
+  direction: 'push' | 'pull';
+  status: 'success' | 'error';
+  details: string;
+  items_affected: number;
   created_at: string;
 }
 

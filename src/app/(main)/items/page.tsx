@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useClients, useItems, useUsers, useStatuses } from '@/hooks/useData';
+import { useClients, useItems, useUsers, useStatuses, useItemUpdates } from '@/hooks/useData';
 import { SlidePanel } from '@/components/ui/SlidePanel';
-import { Modal, FormField, Input, Select, Button } from '@/components/ui/Primitives';
+import { Modal, Tabs, FormField, Input, Select, Button } from '@/components/ui/Primitives';
 import { daysLeft, fmtDate, statusColor, priorityColor } from '@/lib/utils';
 import { Item } from '@/lib/types';
 import KanbanBoard from '@/components/kanban/KanbanBoard';
 import GanttChart from '@/components/gantt/GanttChart';
+import { useAuthStore } from '@/stores/auth';
+import ItemDetailPanel from '@/components/items/ItemDetailPanel';
 
 const PRIORITY_OPTIONS = ['P0', 'P1', 'P2', 'P3'];
 type ViewMode = 'list' | 'kanban' | 'gantt';
@@ -388,104 +390,8 @@ export default function ItemsPage() {
       )}
 
       {/* Slide-out Detail Panel (shared across views) */}
-      <SlidePanel open={!!selectedItem} onClose={() => setSelectedItem(null)} title="Item Details" width="w-[520px]">
-        {selected && (
-          <div className="space-y-1">
-            <div className="mb-4">
-              <div className="text-xs text-gray-400 mb-1">Client</div>
-              <div className="text-sm font-semibold text-[#4556e0]">{selected.client_name}</div>
-            </div>
-
-            <div className="mb-4">
-              <div className="text-xs text-gray-400 mb-1">Item Name</div>
-              <div className="text-sm font-semibold text-gray-800">{selected.item}</div>
-            </div>
-
-            <div className="border-t border-gray-100 pt-3">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Section</div>
-                  <input
-                    value={selected.section || ''}
-                    onChange={e => handleInlineUpdate(selected.id, 'section', e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4556e0]"
-                  />
-                </div>
-                <div>
-                  <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Owner</div>
-                  <input
-                    value={selected.owner || ''}
-                    onChange={e => handleInlineUpdate(selected.id, 'owner', e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4556e0]"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-100 pt-3">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Priority</div>
-                  <select
-                    value={selected.priority}
-                    onChange={e => handleInlineUpdate(selected.id, 'priority', e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4556e0]"
-                  >
-                    {PRIORITY_OPTIONS.map(p => <option key={p}>{p}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Status</div>
-                  <select
-                    value={selected.status}
-                    onChange={e => handleInlineUpdate(selected.id, 'status', e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4556e0]"
-                  >
-                    {statusOptions.map(s => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-100 pt-3">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Start Date</div>
-                  <input
-                    type="date"
-                    value={selected.start_date || ''}
-                    onChange={e => handleInlineUpdate(selected.id, 'start_date', e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4556e0]"
-                  />
-                </div>
-                <div>
-                  <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Due Date</div>
-                  <input
-                    type="date"
-                    value={selected.due_date || ''}
-                    onChange={e => handleInlineUpdate(selected.id, 'due_date', e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4556e0]"
-                  />
-                </div>
-              </div>
-              <div className="mt-2">
-                <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Days Left</div>
-                <div className={`text-sm font-semibold ${(daysLeft(selected.due_date || selected.eta) ?? 0) < 0 ? 'text-red-600' : (daysLeft(selected.due_date || selected.eta) ?? 999) <= 7 ? 'text-amber-600' : 'text-gray-700'}`}>
-                  {daysLeft(selected.due_date || selected.eta) !== null ? `${daysLeft(selected.due_date || selected.eta)}d` : '—'}
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-100 pt-3">
-              <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Last Update</div>
-              <div className="text-sm text-gray-500">{selected.last_update_text || 'No updates yet'}</div>
-            </div>
-
-            {selected.last_update_date && (
-              <div className="text-[10px] text-gray-300 mt-1">Updated: {fmtDate(selected.last_update_date)}</div>
-            )}
-          </div>
-        )}
+      <SlidePanel open={!!selectedItem} onClose={() => setSelectedItem(null)} title="Item Details" width="w-[580px]">
+        {selected && <ItemDetailPanel item={selected} onUpdate={handleInlineUpdate} statusOptions={statusOptions} getStatusColor={getStatusColor} />}
       </SlidePanel>
 
       {/* Add Item Modal */}
