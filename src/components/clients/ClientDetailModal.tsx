@@ -14,6 +14,7 @@ interface ClientDetailModalProps {
   onCreateSheet?: (clientId: string) => Promise<void>;
   onImportSheet?: (clientId: string) => Promise<void>;
   onSyncSheet?: (clientId: string) => Promise<void>;
+  syncing?: boolean;
 }
 
 const HEALTH_OPTIONS = ['Green', 'Amber', 'Red'];
@@ -26,7 +27,7 @@ const OWNER_ROLE_OPTIONS = ['Client', 'QuestionPro', 'Third Party'];
 function healthColor(h: string) { return h === 'Green' ? '#12a06a' : h === 'Amber' ? '#c47c17' : '#d03d3b'; }
 
 export default function ClientDetailModal({
-  open, onClose, client, items, onSave, onCreateSheet, onImportSheet, onSyncSheet
+  open, onClose, client, items, onSave, onCreateSheet, onImportSheet, onSyncSheet, syncing
 }: ClientDetailModalProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const [form, setForm] = useState<Partial<Client>>({});
@@ -34,7 +35,6 @@ export default function ClientDetailModal({
   const [newCategory, setNewCategory] = useState('');
   const [newOwner, setNewOwner] = useState<OwnerPoolEntry>({ name: '', role: 'Client', email: '' });
   const [editingOwnerIdx, setEditingOwnerIdx] = useState<number | null>(null);
-  const [syncing, setSyncing] = useState(false);
 
   // Initialize form when client changes
   const editForm = useMemo(() => {

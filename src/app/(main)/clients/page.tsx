@@ -23,6 +23,7 @@ export default function ClientsPage() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [form, setForm] = useState({ name: '', csm_name: '', region: '', industry: '', phase: 'Implementation', health: 'Green', acv: '', renewal_date: '', renewal_status: 'New Account 1st Year', email: '', owners: '' });
   const [saving, setSaving] = useState(false);
+  const [sheetLoading, setSheetLoading] = useState(false);
 
   const handleAdd = async () => {
     if (!form.name.trim()) return;
@@ -60,6 +61,59 @@ export default function ClientsPage() {
       setSelectedClient(prev => prev ? { ...prev, ...updates } as Client : null);
     }
     return result;
+  };
+
+  const handleCreateSheet = async (clientId: string) => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return;
+    setSheetLoading(true);
+    try {
+      const res = await fetch('/api/create-sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: clientId, client_name: client.name, csm_name: client.csm_name }),
+      });
+      const data = await res.json();
+      if (data.error) { alert('Error: ' + data.error); return; }
+      await updateClient(clientId, { sheet_id: data.sheetId, tab_name: 'Implementation Tracker' });
+      setSelectedClient(prev => prev ? { ...prev, sheet_id: data.sheetId, tab_name: 'Implementation Tracker' } as Client : null);
+      alert('Sheet created successfully!');
+    } catch (e) { alert('Failed to create sheet'); }
+    setSheetLoading(false);
+  };
+
+  const handleImportSheet = async (clientId: string) => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client?.sheet_id) { alert('No sheet linked. Set a Sheet ID first.'); return; }
+    setSheetLoading(true);
+    try {
+      const res = await fetch('/api/import-from-sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: clientId, sheet_id: client.sheet_id, tab_name: client.tab_name }),
+      });
+      const data = await res.json();
+      if (data.error) { alert('Error: ' + data.error); return; }
+      alert(`Imported ${data.itemsImported} items from sheet!`);
+    } catch (e) { alert('Failed to import'); }
+    setSheetLoading(false);
+  };
+
+  const handleSyncSheet = async (clientId: string) => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client?.sheet_id) { alert('No sheet linked.'); return; }
+    setSheetLoading(true);
+    try {
+      const res = await fetch('/api/sync-to-sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: clientId, sheet_id: client.sheet_id, tab_name: client.tab_name }),
+      });
+      const data = await res.json();
+      if (data.error) { alert('Error: ' + data.error); return; }
+      alert(`Synced ${data.itemsSynced} items to sheet!`);
+    } catch (e) { alert('Failed to sync'); }
+    setSheetLoading(false);
   };
 
   if (loading) return <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="h-16 bg-white rounded-xl border border-gray-100 animate-pulse" />)}</div>;
@@ -199,6 +253,10 @@ export default function ClientsPage() {
         client={selectedClient}
         items={items}
         onSave={handleSaveClient}
+        onCreateSheet={handleCreateSheet}
+        onImportSheet={handleImportSheet}
+        onSyncSheet={handleSyncSheet}
+        syncing={sheetLoading}
       />
 
       {/* Add Client Modal */}
