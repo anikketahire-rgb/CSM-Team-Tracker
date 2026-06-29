@@ -5,15 +5,13 @@
  * Tests:
  * 1. Import from sheet → items saved to DB
  * 2. Import from sheet → date column comments saved to item_updates
- * 3. Add comment in app → syncs to sheet via writeComment
- * 4. Edit comment on sheet → import updates the comment in app
- * 5. Duplicate import doesn't create duplicate comments
- * 6. Multiple date columns imported correctly
+ * 3. Re-import updates existing comments (no duplicates)
+ * 4. App and sheet comments coexist
+ * 5. Multiple app comments same date
  */
 
 const SUPABASE_URL = 'https://kunpgcxtzqvkgcopjcnf.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1bnBnY3h0enF2a2djb3BqY25mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0NjQwMTAsImV4cCI6MjA5ODA0MDAxMH0.F6YP5vfnf-m4O2U7DpivsnjMK8BLMmbtugLxOYJRivI';
-const APPS_SCRIPT_URL = ''; // FILL THIS IN
 
 let authToken = '';
 
@@ -97,7 +95,6 @@ async function test1_importItems() {
     csm_name: 'Test CSM',
     health: 'Green',
     phase: 'Implementation',
-    apps_script_url: APPS_SCRIPT_URL,
     sheet_id: 'test_sheet_id',
     tab_name: 'Implementation Tracker',
   });
@@ -326,11 +323,7 @@ async function main() {
   console.log('===================================');
   
   await login();
-  
-  if (!APPS_SCRIPT_URL) {
-    console.log('\n⚠ APPS_SCRIPT_URL not set - skipping Apps Script integration tests');
-    console.log('Testing DB logic only...\n');
-  }
+  console.log('Testing DB logic...\n');
   
   const { clientId, items: dbItems } = await test1_importItems();
   const { itemMap } = await test2_importComments(clientId, dbItems);

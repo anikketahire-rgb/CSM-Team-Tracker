@@ -60,7 +60,7 @@ export default function ItemDetailPanel({ item, onUpdate, statusOptions, getStat
     });
 
     // Sync to Google Sheet if client has sheet configured
-    if (client?.sheet_id && client?.apps_script_url) {
+    if (client?.sheet_id) {
       try {
         const dateCol = formatDateColumn(commentDate);
         const commentText = `[${commentType}] ${commentContent.trim()}`;
@@ -71,9 +71,7 @@ export default function ItemDetailPanel({ item, onUpdate, statusOptions, getStat
             client_id: client.id,
             sheet_id: client.sheet_id,
             tab_name: client.tab_name || 'Implementation Tracker',
-            apps_script_url: client.apps_script_url,
-            item_number: item.row_index || 0,
-            item_name: item.item,
+            item_row_number: item.row_index || 0,
             date_column: dateCol,
             value: commentText,
           }),

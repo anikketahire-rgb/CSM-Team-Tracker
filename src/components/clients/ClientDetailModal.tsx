@@ -316,19 +316,10 @@ export default function ClientDetailModal({
         <div className="space-y-5">
           <div>
             <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Google Sheet</h4>
-            <FormField label="Apps Script Web App URL">
-              <Input
-                value={currentForm.apps_script_url || ''}
-                onChange={e => handleChange('apps_script_url', e.target.value)}
-                placeholder="https://script.google.com/macros/s/.../exec"
-                className="mb-2"
-              />
-              <p className="text-[10px] text-gray-400">Deploy your Apps Script once, paste the URL here. Each CSM needs their own deployment.</p>
-            </FormField>
 
-            <div className="grid grid-cols-2 gap-4 mt-4 mb-4">
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <FormField label="Sheet ID">
-                <Input value={currentForm.sheet_id || ''} onChange={e => handleChange('sheet_id', e.target.value)} placeholder="Google Sheet ID" />
+                <Input value={currentForm.sheet_id || ''} onChange={e => handleChange('sheet_id', e.target.value)} placeholder="Auto-filled after creating sheet" />
               </FormField>
               <FormField label="Tab Name">
                 <Input value={currentForm.tab_name || 'Implementation Tracker'} onChange={e => handleChange('tab_name', e.target.value)} />
@@ -336,7 +327,7 @@ export default function ClientDetailModal({
             </div>
 
             <div className="flex gap-2 mb-3">
-              {currentForm.apps_script_url && !currentForm.sheet_id && (
+              {!currentForm.sheet_id && (
                 <Button onClick={() => onCreateSheet?.(client.id)}>Create Sheet</Button>
               )}
               {currentForm.sheet_id && (
@@ -351,8 +342,19 @@ export default function ClientDetailModal({
               )}
             </div>
 
+            {currentForm.sheet_id && (
+              <a
+                href={`https://docs.google.com/spreadsheets/d/${currentForm.sheet_id}/edit`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-[#4556e0] hover:underline"
+              >
+                Open in Google Sheets ↗
+              </a>
+            )}
+
             {currentForm.sheet_last_synced_at && (
-              <div className="text-[11px] text-gray-400">
+              <div className="text-[11px] text-gray-400 mt-2">
                 Last synced: {fmtDate(currentForm.sheet_last_synced_at)}
               </div>
             )}

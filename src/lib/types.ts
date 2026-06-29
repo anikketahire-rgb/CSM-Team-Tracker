@@ -39,7 +39,6 @@ export interface Client {
   archived: boolean;
   sheet_last_synced_at: string;
   sheet_sync_error: string;
-  apps_script_url: string;
   created_at: string;
 }
 

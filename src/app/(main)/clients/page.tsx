@@ -66,13 +66,12 @@ export default function ClientsPage() {
   const handleCreateSheet = async (clientId: string) => {
     const client = clients.find(c => c.id === clientId);
     if (!client) return;
-    if (!client.apps_script_url) { alert('Set the Apps Script URL in the client Settings tab first.'); return; }
     setSheetLoading(true);
     try {
       const res = await fetch('/api/create-sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_id: clientId, client_name: client.name, csm_name: client.csm_name, apps_script_url: client.apps_script_url }),
+        body: JSON.stringify({ client_id: clientId, client_name: client.name, csm_name: client.csm_name }),
       });
       const data = await res.json();
       if (data.error) { alert('Error: ' + data.error); return; }
@@ -86,13 +85,12 @@ export default function ClientsPage() {
   const handleImportSheet = async (clientId: string) => {
     const client = clients.find(c => c.id === clientId);
     if (!client?.sheet_id) { alert('No sheet linked. Set a Sheet ID first.'); return; }
-    if (!client.apps_script_url) { alert('Set the Apps Script URL in the client Settings tab first.'); return; }
     setSheetLoading(true);
     try {
       const res = await fetch('/api/import-from-sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_id: clientId, sheet_id: client.sheet_id, tab_name: client.tab_name, apps_script_url: client.apps_script_url }),
+        body: JSON.stringify({ client_id: clientId, sheet_id: client.sheet_id, tab_name: client.tab_name }),
       });
       const data = await res.json();
       if (data.error) { alert('Error: ' + data.error); return; }
@@ -104,13 +102,12 @@ export default function ClientsPage() {
   const handleSyncSheet = async (clientId: string) => {
     const client = clients.find(c => c.id === clientId);
     if (!client?.sheet_id) { alert('No sheet linked.'); return; }
-    if (!client.apps_script_url) { alert('Set the Apps Script URL in the client Settings tab first.'); return; }
     setSheetLoading(true);
     try {
       const res = await fetch('/api/sync-to-sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ client_id: clientId, sheet_id: client.sheet_id, tab_name: client.tab_name, apps_script_url: client.apps_script_url }),
+        body: JSON.stringify({ client_id: clientId, sheet_id: client.sheet_id, tab_name: client.tab_name }),
       });
       const data = await res.json();
       if (data.error) { alert('Error: ' + data.error); return; }
