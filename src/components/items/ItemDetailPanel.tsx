@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Tabs, FormField, Input, Select, Button } from '@/components/ui/Primitives';
-import { useItemUpdates } from '@/hooks/useData';
+import { useItemUpdates, useClients } from '@/hooks/useData';
 import { useAuthStore } from '@/stores/auth';
 import { daysLeft, fmtDate } from '@/lib/utils';
-import { Item } from '@/lib/types';
+import { Item, Client } from '@/lib/types';
 
 const UPDATE_TYPES = [
   { value: 'Status Update', color: '#2979c2' },
@@ -24,10 +24,20 @@ interface ItemDetailPanelProps {
   getStatusColor: (status: string) => string;
 }
 
+function formatDateColumn(dateStr: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d.getDate()} ${months[d.getMonth()]}`;
+}
+
 export default function ItemDetailPanel({ item, onUpdate, statusOptions, getStatusColor }: ItemDetailPanelProps) {
   const [activeTab, setActiveTab] = useState('details');
   const { updates, loading: updatesLoading, addUpdate, updateUpdate, deleteUpdate } = useItemUpdates(item.id);
+  const { clients } = useClients();
   const profile = useAuthStore(s => s.profile);
+
+  const client = clients.find(c => c.id === item.client_id);
 
   // Comment form state
   const [commentType, setCommentType] = useState('Status Update');
@@ -48,6 +58,30 @@ export default function ItemDetailPanel({ item, onUpdate, statusOptions, getStat
       update_date: commentDate,
       author: profile?.name || 'Unknown',
     });
+
+    // Sync to Google Sheet if client has sheet configured
+    if (client?.sheet_id && client?.apps_script_url) {
+      try {
+        const dateCol = formatDateColumn(commentDate);
+        const commentText = `[${commentType}] ${commentContent.trim()}`;
+        await fetch('/api/sync-comment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client_id: client.id,
+            sheet_id: client.sheet_id,
+            tab_name: client.tab_name || 'Implementation Tracker',
+            apps_script_url: client.apps_script_url,
+            item_number: item.row_index || 0,
+            date_column: dateCol,
+            value: commentText,
+          }),
+        });
+      } catch (e) {
+        console.error('Failed to sync comment to sheet:', e);
+      }
+    }
+
     setCommentContent('');
     setSavingComment(false);
   };
