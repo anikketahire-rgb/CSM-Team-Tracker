@@ -88,16 +88,27 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      const months: Record<string, string> = { Jan:'01', Feb:'02', Mar:'03', Apr:'04', May:'05', Jun:'06', Jul:'07', Aug:'08', Sep:'09', Oct:'10', Nov:'11', Dec:'12' };
+
       for (const update of dateUpdates) {
-        const itemId = itemMap.get(String(update.itemNumber)) || itemMap.get(update.itemNumber);
+        const itemId = itemMap.get(String(update.itemNumber)) || itemMap.get(update.itemName);
         if (!itemId) continue;
+
+        // Parse "29 Jun" → "2026-06-29"
+        let parsedDate = update.dateColumn;
+        const match = String(update.dateColumn).match(/^(\d{1,2})\s+(\w{3})$/);
+        if (match) {
+          const day = match[1].padStart(2, '0');
+          const month = months[match[2]];
+          if (month) parsedDate = `2026-${month}-${day}`;
+        }
 
         // Check if this update already exists
         const { data: existingUpdate } = await supabase
           .from('item_updates')
           .select('id')
           .eq('item_id', itemId)
-          .eq('update_date', update.dateColumn)
+          .eq('update_date', parsedDate)
           .eq('source', 'sheet')
           .maybeSingle();
 
@@ -108,7 +119,7 @@ export async function POST(req: NextRequest) {
           // Insert new
           await supabase.from('item_updates').insert({
             item_id: itemId,
-            update_date: update.dateColumn,
+            update_date: parsedDate,
             update_type: 'Note',
             content: update.value,
             author: 'Sheet',
