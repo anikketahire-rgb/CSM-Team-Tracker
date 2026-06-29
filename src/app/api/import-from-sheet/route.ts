@@ -35,29 +35,86 @@ export async function POST(req: NextRequest) {
     }
 
     const items = result.items || [];
+    const dateUpdates = result.dateUpdates || [];
 
-    if (items.length > 0) {
-      // Delete existing items for this client (fresh import)
-      await supabase.from('items').delete().eq('client_id', client_id);
+    // Upsert items (update existing by name, insert new ones)
+    for (const item of items) {
+      const itemName = String(item.item || '').trim();
+      if (!itemName) continue;
 
-      // Insert imported items
-      const rows = items.map((item: any, idx: number) => ({
+      // Check if item already exists
+      const { data: existing } = await supabase
+        .from('items')
+        .select('id')
+        .eq('client_id', client_id)
+        .eq('item', itemName)
+        .maybeSingle();
+
+      const rowData = {
         client_id,
         section: item.section || '',
-        item: item.item,
+        item: itemName,
         background: item.background || '',
         owner: item.owner || '',
         priority: item.priority || 'P2',
         status: item.status || 'Not Started',
         start_date: item.start_date || null,
         due_date: item.due_date || null,
-        row_index: item.item_number || (idx + 1),
-      }));
+        row_index: item.item_number || 0,
+      };
 
-      const { error: insertError } = await supabase.from('items').insert(rows);
-      if (insertError) {
-        console.error('Insert error:', insertError);
-        return NextResponse.json({ error: 'Failed to save items: ' + insertError.message }, { status: 500 });
+      if (existing) {
+        // Update existing item (preserves item_updates FK)
+        await supabase.from('items').update(rowData).eq('id', existing.id);
+      } else {
+        // Insert new item
+        await supabase.from('items').insert(rowData);
+      }
+    }
+
+    // Import date column updates as item_updates
+    if (dateUpdates.length > 0) {
+      // Fetch all items for this client to map item_number → item_id
+      const { data: clientItems } = await supabase
+        .from('items')
+        .select('id, row_index, item')
+        .eq('client_id', client_id);
+
+      const itemMap = new Map<string, string>();
+      if (clientItems) {
+        for (const ci of clientItems) {
+          itemMap.set(String(ci.row_index), ci.id);
+          itemMap.set(ci.item, ci.id);
+        }
+      }
+
+      for (const update of dateUpdates) {
+        const itemId = itemMap.get(String(update.itemNumber)) || itemMap.get(update.itemNumber);
+        if (!itemId) continue;
+
+        // Check if this update already exists
+        const { data: existingUpdate } = await supabase
+          .from('item_updates')
+          .select('id')
+          .eq('item_id', itemId)
+          .eq('update_date', update.dateColumn)
+          .eq('source', 'sheet')
+          .maybeSingle();
+
+        if (existingUpdate) {
+          // Update existing
+          await supabase.from('item_updates').update({ content: update.value }).eq('id', existingUpdate.id);
+        } else {
+          // Insert new
+          await supabase.from('item_updates').insert({
+            item_id: itemId,
+            update_date: update.dateColumn,
+            update_type: 'Note',
+            content: update.value,
+            author: 'Sheet',
+            source: 'sheet',
+          });
+        }
       }
     }
 
@@ -75,7 +132,7 @@ export async function POST(req: NextRequest) {
       items_synced: items.length,
     });
 
-    return NextResponse.json({ success: true, itemsImported: items.length });
+    return NextResponse.json({ success: true, itemsImported: items.length, commentsImported: dateUpdates.length });
   } catch (error) {
     console.error('Import from sheet error:', error);
     await supabase
