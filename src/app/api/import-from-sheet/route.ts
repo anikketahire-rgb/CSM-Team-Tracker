@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       await supabase.from('items').delete().eq('client_id', client_id);
 
       // Insert imported items
-      const rows = items.map((item: any) => ({
+      const rows = items.map((item: any, idx: number) => ({
         client_id,
         section: item.section || '',
         item: item.item,
@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
         status: item.status || 'Not Started',
         start_date: item.start_date || null,
         due_date: item.due_date || null,
+        row_index: item.item_number || (idx + 1),
       }));
 
       const { error: insertError } = await supabase.from('items').insert(rows);

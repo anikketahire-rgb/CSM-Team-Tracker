@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
-  const { client_id, sheet_id, tab_name, apps_script_url, item_number, date_column, value } = body;
+  const { client_id, sheet_id, tab_name, apps_script_url, item_number, item_name, date_column, value } = body;
 
   if (!client_id || !sheet_id || !apps_script_url) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
         sheetId: sheet_id,
         tabName: tab_name || 'Implementation Tracker',
         itemNumber: item_number,
+        itemName: item_name,
         dateColumn: date_column,
         value: value,
       }),

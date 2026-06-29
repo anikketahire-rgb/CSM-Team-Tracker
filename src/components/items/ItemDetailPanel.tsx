@@ -73,6 +73,7 @@ export default function ItemDetailPanel({ item, onUpdate, statusOptions, getStat
             tab_name: client.tab_name || 'Implementation Tracker',
             apps_script_url: client.apps_script_url,
             item_number: item.row_index || 0,
+            item_name: item.item,
             date_column: dateCol,
             value: commentText,
           }),
