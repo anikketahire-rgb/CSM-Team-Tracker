@@ -28,11 +28,6 @@ async function login() {
   console.log('Logged in as', data.user?.email);
 }
 
-const headers = {
-  'Content-Type': 'application/json',
-  'apikey': SUPABASE_KEY,
-};
-
 function authHeaders() {
   return {
     'Content-Type': 'application/json',
@@ -50,10 +45,11 @@ async function supabaseQuery(table, params = '') {
 async function supabaseUpdate(table, data, params) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
     method: 'PATCH',
-    headers: { ...headers, 'Prefer': 'return=representation' },
+    headers: { ...authHeaders(), 'Prefer': 'return=representation' },
     body: JSON.stringify(data),
   });
   const json = await res.json();
+  if (!res.ok) { console.error(`Update error on ${table}:`, json); return []; }
   return Array.isArray(json) ? json : [json];
 }
 
@@ -74,33 +70,6 @@ async function supabaseDelete(table, params) {
     headers: authHeaders(),
   });
   return res.status;
-}
-
-async function supabaseUpdate(table, data, params) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
-    method: 'PATCH',
-    headers: { ...authHeaders(), 'Prefer': 'return=representation' },
-    body: JSON.stringify(data),
-  });
-  const json = await res.json();
-  return Array.isArray(json) ? json : [json];
-}
-
-async function supabaseDelete(table, params) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
-    method: 'DELETE',
-    headers,
-  });
-  return res.status;
-}
-
-async function supabaseUpdate(table, data, params) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
-    method: 'PATCH',
-    headers: { ...headers, 'Prefer': 'return=representation' },
-    body: JSON.stringify(data),
-  });
-  return res.json();
 }
 
 let passed = 0;
@@ -274,6 +243,12 @@ async function test3_reimportNoDuplicates(clientId, dbItems, itemMap) {
   const comments = await supabaseQuery('item_updates', 
     `item_id=eq.${dbItems[0].id}&select=id,content,source&order=update_date`);
   assert(comments.length === 2, `Still 2 comments (found ${comments.length})`);
+  
+  // Debug: print actual content
+  for (const c of comments) {
+    console.log(`    [debug] source=${c.source} content="${c.content}"`);
+  }
+  
   assert(comments.some(c => c.content.includes('EDITED')), 'Content updated to EDITED');
   assert(!comments.some(c => c.content.includes('First comment')), 'Old content removed');
   
