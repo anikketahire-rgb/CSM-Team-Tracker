@@ -221,7 +221,7 @@ export default function ItemsPage() {
       {/* ===== LIST VIEW ===== */}
       {viewMode === 'list' && (
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <div className="grid grid-cols-[1fr_1.5fr_120px_100px_100px_100px_120px_120px_40px] gap-2 px-4 py-2.5 border-b border-gray-100 bg-gray-50/50">
+          <div className="grid grid-cols-[0.8fr_2fr_120px_100px_100px_100px_120px_120px_40px] gap-2 px-4 py-2.5 border-b border-gray-100 bg-gray-50/50">
             {['Item', 'Background', 'Owner', 'Priority', 'Start Date', 'Due Date', 'Status', 'Last Update', ''].map(h => (
               <div key={h} className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{h}</div>
             ))}
@@ -242,7 +242,7 @@ export default function ItemsPage() {
                 <div key={clientId}>
                   {/* Client header row */}
                   <div
-                    className="grid grid-cols-[1fr_1.5fr_120px_100px_100px_100px_120px_120px_40px] gap-2 px-4 py-3 bg-blue-50/40 border-b border-gray-100 cursor-pointer hover:bg-blue-50/60 transition-colors"
+                    className="grid grid-cols-[0.8fr_2fr_120px_100px_100px_100px_120px_120px_40px] gap-2 px-4 py-3 bg-blue-50/40 border-b border-gray-100 cursor-pointer hover:bg-blue-50/60 transition-colors"
                     onClick={() => toggleClient(clientId)}
                   >
                     <div className="col-span-9 flex items-center gap-2">
@@ -273,7 +273,7 @@ export default function ItemsPage() {
                     return (
                       <div key={sectionKey}>
                         <div
-                          className="grid grid-cols-[1fr_1.5fr_120px_100px_100px_100px_120px_120px_40px] gap-2 px-4 py-2.5 bg-gray-50/80 border-b border-gray-50 cursor-pointer hover:bg-gray-100/60 transition-colors"
+                          className="grid grid-cols-[0.8fr_2fr_120px_100px_100px_100px_120px_120px_40px] gap-2 px-4 py-2.5 bg-gray-50/80 border-b border-gray-50 cursor-pointer hover:bg-gray-100/60 transition-colors"
                           onClick={() => toggleSection(sectionKey)}
                         >
                           <div className="col-span-9 flex items-center gap-2 pl-5">
@@ -294,11 +294,11 @@ export default function ItemsPage() {
                         {sectionExpanded && sectionItems.map(item => (
                           <div
                             key={item.id}
-                            className="grid grid-cols-[1fr_1.5fr_120px_100px_100px_100px_120px_120px_40px] gap-2 px-4 py-3 border-b border-gray-50 hover:bg-blue-50/20 cursor-pointer transition-colors items-center"
+                            className="grid grid-cols-[0.8fr_2fr_120px_100px_100px_100px_120px_120px_40px] gap-2 px-4 py-3 border-b border-gray-50 hover:bg-blue-50/20 cursor-pointer transition-colors items-center"
                             onClick={() => setSelectedItem(item)}
                           >
                             <div className="text-xs font-medium text-gray-800 truncate pl-5">{item.item}</div>
-                            <div className="text-xs text-gray-500 truncate">{item.last_update_text || '—'}</div>
+                            <div className="text-xs text-gray-500 leading-relaxed line-clamp-3">{item.background || '—'}</div>
                             <div className="text-xs text-gray-500 truncate" onClick={e => e.stopPropagation()}>
                               <input
                                 value={item.owner || ''}
@@ -344,7 +344,7 @@ export default function ItemsPage() {
                               </select>
                             </div>
                             <div className="text-xs text-gray-400 truncate">
-                              {item.last_update_date ? fmtDate(item.last_update_date) : '—'}
+                              {item.last_update_text || '—'}
                             </div>
                             <div className="flex justify-center">
                               <button
