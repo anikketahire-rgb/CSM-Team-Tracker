@@ -34,6 +34,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
+    const items = result.items || [];
+
+    if (items.length > 0) {
+      // Delete existing items for this client (fresh import)
+      await supabase.from('items').delete().eq('client_id', client_id);
+
+      // Insert imported items
+      const rows = items.map((item: any) => ({
+        client_id,
+        section: item.section || '',
+        item: item.item,
+        background: item.background || '',
+        owner: item.owner || '',
+        priority: item.priority || 'P2',
+        status: item.status || 'Not Started',
+        start_date: item.start_date || null,
+        due_date: item.due_date || null,
+      }));
+
+      const { error: insertError } = await supabase.from('items').insert(rows);
+      if (insertError) {
+        console.error('Insert error:', insertError);
+        return NextResponse.json({ error: 'Failed to save items: ' + insertError.message }, { status: 500 });
+      }
+    }
+
     // Update last synced timestamp
     await supabase
       .from('clients')
@@ -45,10 +71,10 @@ export async function POST(req: NextRequest) {
       client_id,
       direction: 'import',
       status: 'success',
-      items_synced: result.itemsImported || 0,
+      items_synced: items.length,
     });
 
-    return NextResponse.json({ success: true, itemsImported: result.itemsImported || 0, items: result.items || [], dateUpdates: result.dateUpdates || [] });
+    return NextResponse.json({ success: true, itemsImported: items.length });
   } catch (error) {
     console.error('Import from sheet error:', error);
     await supabase
