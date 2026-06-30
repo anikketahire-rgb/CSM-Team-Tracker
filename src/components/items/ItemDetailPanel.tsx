@@ -95,7 +95,32 @@ export default function ItemDetailPanel({ item, onUpdate, statusOptions, getStat
 
   const handleEdit = async (id: string) => {
     if (!editContent.trim()) return;
+    const existing = updates.find(u => u.id === id);
     await updateUpdate(id, { content: editContent.trim() });
+
+    if (existing && client?.sheet_id && client?.apps_script_url) {
+      try {
+        const dateCol = formatDateColumn(existing.update_date);
+        const commentText = `[${existing.update_type}] ${editContent.trim()}`;
+        await fetch('/api/sync-comment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client_id: client.id,
+            sheet_id: client.sheet_id,
+            tab_name: client.tab_name || 'Implementation Tracker',
+            apps_script_url: client.apps_script_url,
+            item_number: item.row_index,
+            item_name: item.item,
+            date_column: dateCol,
+            value: commentText,
+          }),
+        });
+      } catch (e) {
+        console.error('[Comment Sync] Edit sync failed:', e);
+      }
+    }
+
     setEditingId(null);
     setEditContent('');
   };
