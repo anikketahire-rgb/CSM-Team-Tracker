@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     const { data: client } = await supabase
       .from('clients')
-      .select('name, csm_name, report_frequency')
+      .select('name, csm_name, report_frequency, categories')
       .eq('id', client_id)
       .single();
 
@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
         clientName: client?.name,
         csmName: client?.csm_name,
         reportFrequency: client?.report_frequency || 'Weekly',
+        categories: client?.categories || [],
         items: items || [],
       }),
     });
