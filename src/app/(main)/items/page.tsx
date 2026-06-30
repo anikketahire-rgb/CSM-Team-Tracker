@@ -15,7 +15,7 @@ const PRIORITY_OPTIONS = ['P0', 'P1', 'P2', 'P3'];
 type ViewMode = 'list' | 'kanban' | 'gantt';
 
 export default function ItemsPage() {
-  const { clients } = useClients();
+  const { clients, updateClient } = useClients();
   const { users } = useUsers();
   const { items, loading, addItem, updateItem } = useItems();
   const { statuses: itemStatuses } = useStatuses('item');
@@ -31,6 +31,15 @@ export default function ItemsPage() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ client_id: '', section: '', item: '', priority: 'P2', status: 'Not Started', owner: '', start_date: '', due_date: '' });
   const [saving, setSaving] = useState(false);
+  const [showNewSectionInput, setShowNewSectionInput] = useState(false);
+  const [newSectionName, setNewSectionName] = useState('');
+
+  // Get sections for the selected client
+  const selectedClientCategories = useMemo(() => {
+    if (!form.client_id) return [];
+    const client = clients.find(c => c.id === form.client_id);
+    return client?.categories || [];
+  }, [form.client_id, clients]);
 
   // Expanded states for collapsible groups (list view)
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
@@ -116,10 +125,26 @@ export default function ItemsPage() {
   const handleAdd = async () => {
     if (!form.item.trim() || !form.client_id) return;
     setSaving(true);
-    const { error } = await addItem({ ...form });
+
+    // If adding a new section, save it to the client's categories first
+    if (showNewSectionInput && newSectionName.trim()) {
+      const client = clients.find(c => c.id === form.client_id);
+      if (client) {
+        const currentCategories = client.categories || [];
+        if (!currentCategories.includes(newSectionName.trim())) {
+          await updateClient(client.id, { categories: [...currentCategories, newSectionName.trim()] });
+        }
+        setForm({ ...form, section: newSectionName.trim() });
+      }
+    }
+
+    const sectionToSave = showNewSectionInput ? newSectionName.trim() : form.section;
+    const { error } = await addItem({ ...form, section: sectionToSave });
     setSaving(false);
     if (!error) {
       setShowModal(false);
+      setShowNewSectionInput(false);
+      setNewSectionName('');
       setForm({ client_id: '', section: '', item: '', priority: 'P2', status: 'Not Started', owner: '', start_date: '', due_date: '' });
     }
   };
@@ -395,20 +420,73 @@ export default function ItemsPage() {
       </SlidePanel>
 
       {/* Add Item Modal */}
-      <Modal open={showModal} onClose={() => setShowModal(false)} title="Add item" footer={
+      <Modal open={showModal} onClose={() => { setShowModal(false); setShowNewSectionInput(false); setNewSectionName(''); }} title="Add item" footer={
         <>
-          <Button variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button>
-          <Button onClick={handleAdd} disabled={saving || !form.item.trim() || !form.client_id}>{saving ? 'Saving...' : 'Save'}</Button>
+          <Button variant="secondary" onClick={() => { setShowModal(false); setShowNewSectionInput(false); setNewSectionName(''); }}>Cancel</Button>
+          <Button onClick={handleAdd} disabled={saving || !form.item.trim() || !form.client_id || (showNewSectionInput && !newSectionName.trim())}>{saving ? 'Saving...' : 'Save'}</Button>
         </>
       }>
         <div className="space-y-4">
           <FormField label="Client *">
-            <Select value={form.client_id} onChange={e => setForm({...form, client_id: e.target.value})}>
+            <Select value={form.client_id} onChange={e => {
+              setForm({...form, client_id: e.target.value, section: ''});
+              setShowNewSectionInput(false);
+              setNewSectionName('');
+            }}>
               <option value="">Select client</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
           </FormField>
-          <FormField label="Section"><Input value={form.section} onChange={e => setForm({...form, section: e.target.value})} placeholder="e.g. Account Setup" /></FormField>
+          <FormField label="Section">
+            {showNewSectionInput ? (
+              <div className="flex gap-2">
+                <Input
+                  value={newSectionName}
+                  onChange={e => setNewSectionName(e.target.value)}
+                  placeholder="Enter section name"
+                  className="flex-1"
+                  autoFocus
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    if (newSectionName.trim()) {
+                      setForm({ ...form, section: newSectionName.trim() });
+                      setShowNewSectionInput(false);
+                    }
+                  }}
+                >Add</Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowNewSectionInput(false);
+                    setNewSectionName('');
+                  }}
+                >Cancel</Button>
+              </div>
+            ) : (
+              <Select
+                value={form.section}
+                onChange={e => {
+                  if (e.target.value === '__new__') {
+                    setShowNewSectionInput(true);
+                    setNewSectionName('');
+                  } else {
+                    setForm({ ...form, section: e.target.value });
+                  }
+                }}
+              >
+                <option value="">Select section</option>
+                {selectedClientCategories.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+                {!form.client_id && <option value="" disabled>Select a client first</option>}
+                {form.client_id && <option value="__new__">+ Add new section</option>}
+              </Select>
+            )}
+          </FormField>
           <FormField label="Item *"><Input value={form.item} onChange={e => setForm({...form, item: e.target.value})} placeholder="e.g. SSO Configuration" /></FormField>
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Priority"><Select value={form.priority} onChange={e => setForm({...form, priority: e.target.value})}>{PRIORITY_OPTIONS.map(p => <option key={p}>{p}</option>)}</Select></FormField>
