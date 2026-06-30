@@ -60,11 +60,13 @@ export default function ItemDetailPanel({ item, onUpdate, statusOptions, getStat
     });
 
     // Sync to Google Sheet if client has sheet configured
+    console.log('[Comment Sync] client:', { sheet_id: client?.sheet_id, apps_script_url: client?.apps_script_url, tab_name: client?.tab_name });
     if (client?.sheet_id && client?.apps_script_url) {
       try {
         const dateCol = formatDateColumn(commentDate);
         const commentText = `[${commentType}] ${commentContent.trim()}`;
-        await fetch('/api/sync-comment', {
+        console.log('[Comment Sync] Sending:', { item_number: item.row_index, item_name: item.item, date_column: dateCol, value: commentText });
+        const syncRes = await fetch('/api/sync-comment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -72,15 +74,19 @@ export default function ItemDetailPanel({ item, onUpdate, statusOptions, getStat
             sheet_id: client.sheet_id,
             tab_name: client.tab_name || 'Implementation Tracker',
             apps_script_url: client.apps_script_url,
-            item_number: item.row_index || 0,
+            item_number: item.row_index,
             item_name: item.item,
             date_column: dateCol,
             value: commentText,
           }),
         });
+        const syncData = await syncRes.json();
+        console.log('[Comment Sync] Response:', syncRes.status, syncData);
       } catch (e) {
-        console.error('Failed to sync comment to sheet:', e);
+        console.error('[Comment Sync] Failed:', e);
       }
+    } else {
+      console.log('[Comment Sync] SKIPPED — missing sheet_id or apps_script_url');
     }
 
     setCommentContent('');
