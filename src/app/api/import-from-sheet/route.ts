@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { readSheetData } from '@/lib/google-sheets';
 
 const MONTHS: Record<string, string> = { Jan:'01', Feb:'02', Mar:'03', Apr:'04', May:'05', Jun:'06', Jul:'07', Aug:'08', Sep:'09', Oct:'10', Nov:'11', Dec:'12' };
 
@@ -21,21 +20,39 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
-  const { client_id, sheet_id, tab_name } = body;
+  const { client_id, sheet_id, tab_name, apps_script_url } = body;
 
   if (!client_id || !sheet_id) {
     return NextResponse.json({ error: 'Missing client_id or sheet_id' }, { status: 400 });
   }
 
+  if (!apps_script_url) {
+    return NextResponse.json({ error: 'No Apps Script URL configured for this client.' }, { status: 400 });
+  }
+
   try {
-    const { items, dateUpdates } = await readSheetData(
-      sheet_id,
-      tab_name || 'Implementation Tracker',
-    );
+    const response = await fetch(apps_script_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'importFromSheet',
+        sheetId: sheet_id,
+        tabName: tab_name || 'Implementation Tracker',
+      }),
+    });
+
+    const result = await response.json();
+
+    if (result.error) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+
+    const items = result.items || [];
+    const dateUpdates = result.dateUpdates || [];
 
     // Upsert items
     for (const item of items) {
-      const itemName = item.item;
+      const itemName = String(item.item || '').trim();
       if (!itemName) continue;
 
       const { data: existing } = await supabase
@@ -55,7 +72,7 @@ export async function POST(req: NextRequest) {
         status: item.status || 'Not Started',
         start_date: item.start_date || null,
         due_date: item.due_date || null,
-        row_index: item.row_index || 0,
+        row_index: item.item_number || 0,
       };
 
       if (existing) {
@@ -129,6 +146,6 @@ export async function POST(req: NextRequest) {
       .from('clients')
       .update({ sheet_sync_error: error.message || String(error) })
       .eq('id', client_id);
-    return NextResponse.json({ error: error.message || 'Failed to import from sheet' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to import from sheet' }, { status: 500 });
   }
 }

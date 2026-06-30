@@ -316,10 +316,19 @@ export default function ClientDetailModal({
         <div className="space-y-5">
           <div>
             <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Google Sheet</h4>
+            <FormField label="Apps Script Web App URL">
+              <Input
+                value={currentForm.apps_script_url || ''}
+                onChange={e => handleChange('apps_script_url', e.target.value)}
+                placeholder="https://script.google.com/macros/s/.../exec"
+                className="mb-2"
+              />
+              <p className="text-[10px] text-gray-400">Deploy your Apps Script once, paste the URL here. Each CSM needs their own deployment.</p>
+            </FormField>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-2 gap-4 mt-4 mb-4">
               <FormField label="Sheet ID">
-                <Input value={currentForm.sheet_id || ''} onChange={e => handleChange('sheet_id', e.target.value)} placeholder="Auto-filled after creating sheet" />
+                <Input value={currentForm.sheet_id || ''} onChange={e => handleChange('sheet_id', e.target.value)} placeholder="Google Sheet ID" />
               </FormField>
               <FormField label="Tab Name">
                 <Input value={currentForm.tab_name || 'Implementation Tracker'} onChange={e => handleChange('tab_name', e.target.value)} />
@@ -327,7 +336,7 @@ export default function ClientDetailModal({
             </div>
 
             <div className="flex gap-2 mb-3">
-              {!currentForm.sheet_id && (
+              {currentForm.apps_script_url && !currentForm.sheet_id && (
                 <Button onClick={() => onCreateSheet?.(client.id)}>Create Sheet</Button>
               )}
               {currentForm.sheet_id && (
